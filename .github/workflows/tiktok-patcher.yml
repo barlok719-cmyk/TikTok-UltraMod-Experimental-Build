@@ -663,114 +663,12 @@ jobs:
         run: |
           set +e
           mkdir -p diagnostics
-          AAPT=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/aapt 2>/dev/null | sort -V | tail -1)
           for APK in raw-base-original.apk raw-merged-original.apk; do
             if [ -s "$APK" ]; then
               cp "$APK" diagnostics/
-              {
-                echo "=== $APK ==="
-                sha256sum "$APK"
-                if [ -n "$AAPT" ]; then
-                  "$AAPT" dump badging "$APK" | grep -m1 "^package:"
-                fi
-                echo "=== DEX entries ==="
-                unzip -Z1 "$APK" | grep -E '^classes([0-9]+)?\.dex        run: |
-          echo "${{ secrets.KEYSTORE_B64 }}" | base64 --decode > new.keystore
-
-          APKSIGNER=$(ls $ANDROID_SDK_ROOT/build-tools/*/apksigner | tail -1)
-
-          should_build() {
-            [ "$BUILD_VARIANT" = "$1" ] || [ "$BUILD_VARIANT" = "both" ]
-          }
-
-          sign_variant() {
-            VARIANT="$1"
-            $APKSIGNER sign --ks new.keystore \
-              --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
-              --ks-key-alias ${{ secrets.KEY_ALIAS }} \
-              --out "tiktok-rv-${VARIANT}.apk" "unsigned-merged-${VARIANT}.apk"
-          }
-
-          if should_build original; then
-            sign_variant original
-          fi
-
-          if should_build asia; then
-            sign_variant asia
-          fi
-
-      - name: Verify APK package, version and signing certificate
-        shell: bash
-        run: |
-          set -euo pipefail
-          AAPT=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/aapt | sort -V | tail -1)
-          APKSIGNER=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -1)
-
-          for APK in tiktok-rv-*.apk; do
-            [ -f "$APK" ] || continue
-            echo "=== APK: $APK ==="
-            echo "SHA-256:"
-            sha256sum "$APK"
-            echo "Package and version:"
-            "$AAPT" dump badging "$APK" | grep -m1 "^package:"
-            echo "Signing certificate:"
-            "$APKSIGNER" verify --verbose --print-certs "$APK" | grep -E "Signer #|certificate SHA-256 digest|Verified using"
-          done
-
-      - name: Upload prototype APK
-        if: github.ref != 'refs/heads/main'
-        uses: actions/upload-artifact@v6
-        with:
-          name: tiktok-ultramod-prototype
-          path: |
-            tiktok-rv-*.apk
-            color-audit-*.txt.gz
-            accent-map-*.json
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          AAPT=$(ls $ANDROID_SDK_ROOT/build-tools/*/aapt | tail -1)
-          ASSETS=()
-
-          {
-            echo "Automated build of tiktok-rv."
-            echo
-
-            if [ -f tiktok-rv-original.apk ]; then
-              ORIGINAL_VERSION=$($AAPT dump badging raw-base-original.apk | grep -oP "versionName='\K[^']+")
-              echo "- original: com.zhiliaoapp.musically v${ORIGINAL_VERSION}"
-              ASSETS+=(tiktok-rv-original.apk)
-            fi
-
-            if [ -f tiktok-rv-asia.apk ]; then
-              ASIA_VERSION=$($AAPT dump badging raw-base-asia.apk | grep -oP "versionName='\K[^']+")
-              echo "- asia: com.ss.android.ugc.trill v${ASIA_VERSION}"
-              ASSETS+=(tiktok-rv-asia.apk)
-            fi
-
-            for VARIANT in original asia; do
-              if [ -s "failed-patches-${VARIANT}.txt" ]; then
-                echo
-                echo "⚠️ Not applied to the ${VARIANT} build (this TikTok version changed the patched code):"
-                sed 's/^/- /' "failed-patches-${VARIANT}.txt"
-              fi
-            done
-          } > release-notes.md
-
-          TAG="v$(date +'%Y.%m.%d')"
-          # Delete existing release with same tag if it exists (idempotent re-runs)
-          gh release delete "$TAG" --yes 2>/dev/null || true
-          git push origin --delete "$TAG" 2>/dev/null || true
-          gh release create "$TAG" "${ASSETS[@]}" \
-            --title "tiktok-rv $TAG" \
-            --notes-file release-notes.md
-
-              } >> diagnostics/apk-metadata.txt
+              echo "=== $APK ===" >> diagnostics/apk-metadata.txt
+              sha256sum "$APK" >> diagnostics/apk-metadata.txt
+              unzip -Z1 "$APK" | grep 'classes.*dex' >> diagnostics/apk-metadata.txt
             fi
           done
           for FILE in patch-original.log failed-patches-original.txt color-audit-full-original.txt.gz color-audit-original.txt.gz; do
@@ -794,7 +692,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
-
       - name: Sign Universal APKs
         run: |
           echo "${{ secrets.KEYSTORE_B64 }}" | base64 --decode > new.keystore
