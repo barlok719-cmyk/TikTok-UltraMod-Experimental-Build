@@ -70,11 +70,11 @@ val showSeekbarPatch = bytecodePatch(
         }
 
         // The following if-nez consumes this result. Set only this experiment
-        // result to false; lifecycle, page, story, drag, mask, prompt and
+        // result to true; lifecycle, page, story, drag, mask, prompt and
         // prohibited-video checks continue to run unchanged.
         eligibilityMethod.addInstructions(
             inverseMoveResultIndex + 1,
-            "const/4 v$inverseResultRegister, 0x0",
+            "const/4 v$inverseResultRegister, 0x1",
         )
 
         // TikTok's feed controller computes a native show type in this method.
