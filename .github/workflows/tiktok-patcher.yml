@@ -1,4 +1,5 @@
 name: Automate TikTok Patching
+# Consolidated 47.9.3 runtime-fix build: seekbar experiment polarity + About layout.
 
 on:
   push:
