@@ -53,6 +53,7 @@ jobs:
 
     permissions:
       contents: write # Needed to create a GitHub Release
+      packages: read # Needed to resolve ReVanced packages
       id-token: write
 
     env:
