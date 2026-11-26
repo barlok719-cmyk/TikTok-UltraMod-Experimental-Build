@@ -34,7 +34,7 @@ jobs:
           set -euo pipefail
           SOURCE_DIR="$RUNNER_TEMP/tiktok-ultramod-source"
           test -d "$SOURCE_DIR/.git"
-          rsync -a --delete --exclude='.git/' --exclude='revanced-patches/local.properties' "$SOURCE_DIR/" "$GITHUB_WORKSPACE/"
+          rsync -a --delete --exclude='.git/' --exclude='.github/workflows/import-experimental.yml' --exclude='revanced-patches/local.properties' "$SOURCE_DIR/" "$GITHUB_WORKSPACE/"
           test -f .github/workflows/tiktok-patcher.yml
           test -f revanced-patches/settings.gradle.kts
           test -d revanced-patches/patches
