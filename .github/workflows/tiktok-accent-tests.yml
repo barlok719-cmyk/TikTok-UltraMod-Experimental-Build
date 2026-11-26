@@ -1,0 +1,102 @@
+name: Test TikTok accent helper
+
+on:
+  push:
+    branches:
+      - ultramod/prototype
+    paths:
+      - "tools/tiktok_accent/**"
+      - "tools/__init__.py"
+      - ".github/workflows/tiktok-accent-tests.yml"
+      - ".github/workflows/tiktok-patcher.yml"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate workflow YAML syntax
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          for path in sorted(Path(".github/workflows").glob("*.yml")):
+              with path.open(encoding="utf-8") as handle:
+                  yaml.safe_load(handle)
+              print(f"YAML syntax OK: {path}")
+          PY
+
+      - name: Compile helper modules
+        run: python3 -m compileall -q tools/tiktok_accent
+
+      - name: Run palette regression tests
+        run: python3 -m unittest tools.tiktok_accent.test_palette -v
+  apk-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Download last verified prototype APK
+        uses: actions/download-artifact@v4
+        with:
+          name: tiktok-ultramod-prototype
+          path: input
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 44897473511
+
+      - name: Check accent parser against TikTok 47.9.3 APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=$(find input -type f -name 'tiktok-rv-original.apk' | head -n 1)
+          test -n "$APK"
+          python3 -m tools.tiktok_accent.apply "$APK" 6750A4 --dry-run
+
+      - name: Verify real APK resource rewrite and input preservation
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=$(find input -type f -name 'tiktok-rv-original.apk' | head -n 1)
+          BEFORE=$(sha256sum "$APK" | cut -d ' ' -f 1)
+          python3 -m tools.tiktok_accent.apply "$APK" 6750A4 --output output/accented.apk --pairs-output output/accent-map.json
+          AFTER=$(sha256sum "$APK" | cut -d ' ' -f 1)
+          test "$BEFORE" = "$AFTER"
+          python3 - <<'PY'
+          import json
+          import zipfile
+          from pathlib import Path
+
+          apk = Path("output/accented.apk")
+          mapping = json.loads(Path("output/accent-map.json").read_text(encoding="utf-8"))
+          assert apk.is_file() and apk.stat().st_size > 100_000_000
+          with zipfile.ZipFile(apk) as archive:
+              assert "resources.arsc" in archive.namelist()
+              assert archive.testzip() is None
+          assert mapping["format"] == 1
+          assert mapping["reference"] == "FE2C55"
+          assert mapping["pairs"], "expected resource colours to be mapped"
+          print(f"Rewritten APK ZIP OK: {apk.stat().st_size} bytes")
+          print(f"Resource mapping entries: {len(mapping['pairs'])}")
+          print("Original input APK SHA-256 unchanged.")
+          PY

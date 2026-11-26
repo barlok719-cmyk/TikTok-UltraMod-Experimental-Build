@@ -1,0 +1,9 @@
+MCC-MNC dataset attribution
+
+Data source: MCC-MNC.dev
+Source URL: https://mcc-mnc.dev/data/networks.min.json
+Project information: https://mcc-mnc.dev/about-data
+License: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+License text: https://creativecommons.org/licenses/by-sa/4.0/
+
+This file is a redistributed copy of the MCC-MNC.dev network dataset. The dataset is provided under CC BY-SA 4.0. If you adapt or redistribute the dataset, retain attribution and apply the same license to the adapted dataset.

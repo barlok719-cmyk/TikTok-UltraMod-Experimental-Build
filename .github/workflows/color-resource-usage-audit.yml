@@ -1,0 +1,168 @@
+name: Audit TikTok color resource usages
+
+on:
+  push:
+    branches:
+      - ultramod/prototype
+    paths:
+      - ".github/workflows/color-resource-usage-audit.yml"
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "GitHub Actions run ID containing tiktok-ultramod-prototype"
+        required: true
+        default: "44897473511"
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Download existing prototype artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tiktok-ultramod-prototype
+          path: input
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.run_id || '44897473511' }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Download Apktool
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import urllib.request
+
+          req = urllib.request.Request(
+              "https://api.github.com/repos/iBotPeaches/Apktool/releases/latest",
+              headers={"Accept": "application/vnd.github+json", "User-Agent": "TikTok-Color-Audit"},
+          )
+          with urllib.request.urlopen(req, timeout=30) as response:
+              release = json.load(response)
+
+          assets = [
+              item for item in release.get("assets", [])
+              if item["name"].endswith(".jar")
+              and item["name"].startswith("apktool_")
+              and "empty-framework" not in item["name"]
+          ]
+          if not assets:
+              raise SystemExit("Could not find the official Apktool JAR in the latest release.")
+          asset = assets[0]
+          print(f"Downloading {asset['name']} from official Apktool release {release.get('tag_name')}")
+          urllib.request.urlretrieve(asset["browser_download_url"], "apktool.jar")
+          PY
+
+      - name: Decode APK and trace candidate color IDs
+        shell: bash
+        env:
+          JAVA_TOOL_OPTIONS: "-Xms512m -Xmx4g -XX:+UseG1GC"
+        run: |
+          set -euo pipefail
+          APK=$(find input -maxdepth 2 -type f -name '*.apk' | head -n 1)
+          test -n "$APK"
+          echo "APK selected: $APK"
+          java -jar apktool.jar d -f -o decoded "$APK"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          candidates = {
+              "0x60030007": ("df_ship:color/acn", "#FE2C55"),
+              "0x7f080030": ("color/br", "#FE2C55"),
+              "0x7f080031": ("color/bs", "#FE2C55"),
+              "0x7f080048": ("color/ce", "#FE2C55"),
+              "0x7f08017f": ("color/kt", "#FE2C55"),
+              "0x7f0801ab": ("color/m0", "#FE2C55"),
+              "0x7f08030f": ("color/vm", "#FE2C55"),
+              "0x7f08036b": ("color/y4", "#FE2C55"),
+              "0x7f0803b8": ("color/a07", "#FE2C55"),
+              "0x7f0803c1": ("color/a0f", "#FE2C55"),
+              "0x7f0803c4": ("color/a0i", "#FE2C55"),
+              "0x7f0803c7": ("color/a0l", "#FE2C55"),
+              "0x7f080425": ("color/a35", "#FE2C55"),
+              "0x7f080432": ("color/a3h", "#FE2C55"),
+              "0x7f08045d": ("color/a4n", "#FE2C55"),
+              "0x7f080461": ("color/a4r", "#FE2C55"),
+              "0x7f080462": ("color/a4s", "#FE2C55"),
+              "0x7f080467": ("color/a4x", "#FE2C55"),
+              "0x7f080482": ("color/a5n", "#FE2C55"),
+              "0x7f080485": ("color/a5q", "#FE2C55"),
+              "0x7f080493": ("color/a64", "#FE2C55"),
+              "0x7f0804b2": ("color/a6y", "#FE2C55"),
+              "0x7f0804be": ("color/a7_", "#FE2C55"),
+              "0x7f0804f5": ("color/a8r", "#FE2C55"),
+              "0x7f08010c": ("color/hp", "#2196F3"),
+              "0x7f080115": ("color/hy", "#2196F3"),
+              "0x7f08010d": ("color/hq", "#8E79F1"),
+              "0x7f0801ac": ("color/m1", "#25F4EE"),
+              "0x7f080310": ("color/vn", "#25F4EE"),
+              "0x7f08049d": ("color/a6d", "#25F4EE"),
+              "0x7f080000": ("color/ag", "#FACE15"),
+              "0x7f080290": ("color/s7", "#FACE15"),
+              "0x7f080318": ("color/vv", "#FACE15"),
+              "0x7f080363": ("color/xw", "#FACE15"),
+              "0x7f08042b": ("color/a3a", "#FACE15"),
+              "0x7f080545": ("color/a_x", "#FACE15"),
+          }
+
+          roots = [Path("decoded/res"), *Path("decoded").glob("smali*")]
+          report = Path("color-resource-usage.txt")
+          hits = {key: [] for key in candidates}
+          scanned = 0
+
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in root.rglob("*"):
+                  if not path.is_file():
+                      continue
+                  try:
+                      content = path.read_text(encoding="utf-8", errors="ignore")
+                  except OSError:
+                      continue
+                  scanned += 1
+                  for number, line in enumerate(content.splitlines(), 1):
+                      lower = line.lower()
+                      for rid, (name, _color) in candidates.items():
+                          resource_name = name.split(":")[-1]
+                          if rid in lower or f"@{name.lower()}" in lower or f"@color/{resource_name}" in lower:
+                              hits[rid].append((str(path), number, line.strip()[:500]))
+
+          with report.open("w", encoding="utf-8") as out:
+              out.write("TikTok color resource usage audit\\n")
+              out.write("APK decoded with official Apktool; this report is diagnostic only.\\n")
+              out.write(f"Text files scanned: {scanned}\\n\\n")
+              for rid, (name, color) in candidates.items():
+                  rows = hits[rid]
+                  out.write(f"{name} | {rid} | {color} | matches={len(rows)}\\n")
+                  for path, number, line in rows[:250]:
+                      out.write(f"  {path}:{number}: {line}\\n")
+                  if len(rows) > 250:
+                      out.write(f"  ... {len(rows)-250} additional matches omitted\\n")
+                  out.write("\\n")
+
+          print(f"Scanned {scanned} decoded text files.")
+          print(f"Wrote {report}; total matches: {sum(map(len, hits.values()))}")
+          PY
+
+      - name: Upload color usage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiktok-color-resource-usage
+          path: color-resource-usage.txt
+          if-no-files-found: error
+          retention-days: 14
