@@ -302,7 +302,7 @@ public class UltraModSettingsFragment extends Fragment {
         row.setClickable(true);
         row.setFocusable(true);
         row.setOnClickListener(v -> toggle.setChecked(!toggle.isChecked()));
-        if (android.os.Build.VERSION.SDK_INT >= 21) {
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
             toggle.setThumbTintList(new ColorStateList(
                     new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
                     new int[]{ACCENT, 0xFF81788B}));
