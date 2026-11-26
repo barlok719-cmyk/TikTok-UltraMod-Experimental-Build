@@ -13,6 +13,7 @@ jobs:
       - name: Checkout destination repository
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.DESTINATION_REPO_TOKEN }}
           persist-credentials: true
 
       - name: Clone private experimental branch
