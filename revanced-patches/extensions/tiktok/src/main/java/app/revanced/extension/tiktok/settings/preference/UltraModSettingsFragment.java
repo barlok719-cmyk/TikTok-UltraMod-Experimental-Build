@@ -173,11 +173,15 @@ public class UltraModSettingsFragment extends Fragment {
 
         addSectionLabel("ОБ ULTRAMOD");
         LinearLayout about = panel();
+        about.setOrientation(LinearLayout.VERTICAL);
         TextView aboutTitle = text("Сделано для удобной настройки TikTok", 14, TEXT, Typeface.BOLD);
+        aboutTitle.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
         TextView aboutSummary = text("Все основные функции мода собраны в одном месте.", 12, MUTED, Typeface.NORMAL);
+        LinearLayout.LayoutParams aboutSummaryParams = new LinearLayout.LayoutParams(-1, -2);
+        aboutSummaryParams.topMargin = dp(6);
         about.addView(aboutTitle);
-        about.addView(aboutSummary);
-        content.addView(about);
+        about.addView(aboutSummary, aboutSummaryParams);
+        content.addView(about, new LinearLayout.LayoutParams(-1, -2));
         TextView version = text("TIKTOK ULTRAMOD  ·  ВЕРСИЯ 1.0", 10, MUTED, Typeface.BOLD);
         version.setGravity(Gravity.CENTER);
         version.setPadding(0, dp(20), 0, dp(4));
