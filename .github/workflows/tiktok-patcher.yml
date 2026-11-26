@@ -663,17 +663,9 @@ jobs:
         run: |
           set +e
           mkdir -p diagnostics
-          for APK in raw-base-original.apk raw-merged-original.apk; do
-            if [ -s "$APK" ]; then
-              cp "$APK" diagnostics/
-              echo "=== $APK ===" >> diagnostics/apk-metadata.txt
-              sha256sum "$APK" >> diagnostics/apk-metadata.txt
-              unzip -Z1 "$APK" | grep 'classes.*dex' >> diagnostics/apk-metadata.txt
-            fi
-          done
-          for FILE in patch-original.log failed-patches-original.txt color-audit-full-original.txt.gz color-audit-original.txt.gz; do
-            if [ -s "$FILE" ]; then cp "$FILE" diagnostics/; fi
-          done
+          AAPT=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/aapt 2>/dev/null | sort -V | tail -1)
+
+          # Keep diagnostic metadata, never copy full APK binaries into the report.
           {
             echo "Workflow run: $GITHUB_RUN_ID"
             echo "Commit: $GITHUB_SHA"
@@ -681,16 +673,63 @@ jobs:
             echo "Version mode: $VERSION_MODE"
             echo "Requested TikTok version: ${TIKTOK_VERSION:-auto}"
             echo "Accent preset: $ACCENT_PRESET"
+            echo "Accent HEX: ${ACCENT_HEX:-not-resolved}"
+            echo
+            for APK in raw-base-original.apk raw-merged-original.apk; do
+              if [ -s "$APK" ]; then
+                echo "=== $APK ==="
+                du -h "$APK"
+                sha256sum "$APK"
+                if [ -n "$AAPT" ]; then
+                  "$AAPT" dump badging "$APK" 2>/dev/null | grep -m1 "^package:" || true
+                fi
+                unzip -Z1 "$APK" 2>/dev/null | grep 'classes.*dex' || true
+                echo
+              fi
+            done
+            if [ -n "$AAPT" ] && [ -s raw-base-original.apk ]; then
+              echo "Detected TikTok version:"
+              "$AAPT" dump badging raw-base-original.apk 2>/dev/null | grep -oP "versionName='\\K[^']+" | head -1 || true
+            fi
           } > diagnostics/build-context.txt
 
-      - name: Upload TikTok patch diagnostics
+          for FILE in patch-original.log failed-patches-original.txt; do
+            if [ -s "$FILE" ]; then cp "$FILE" diagnostics/; fi
+          done
+          for FILE in color-audit-full-original.txt.gz color-audit-original.txt.gz color-audit-original.txt.gz.info accent-map-original.json; do
+            if [ -s "$FILE" ]; then cp "$FILE" diagnostics/; fi
+          done
+
+          # Record source split inventory without retaining the split APK files.
+          if [ -d tiktok_original_dl ]; then
+            find tiktok_original_dl -maxdepth 1 -type f -printf '%f | %s bytes\\n' \
+              | sort > diagnostics/source-apk-inventory.txt
+          fi
+
+      - name: Upload patch report
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: tiktok-patch-diagnostics
-          path: diagnostics/
+          name: tiktok-patch-report
+          path: |
+            diagnostics/build-context.txt
+            diagnostics/patch-original.log
+            diagnostics/failed-patches-original.txt
+            diagnostics/source-apk-inventory.txt
           if-no-files-found: warn
-          retention-days: 3
+          retention-days: 30
+          compression-level: 6
+
+      - name: Upload resource analysis
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tiktok-resource-analysis
+          path: |
+            diagnostics/color-audit-*.txt.gz
+            diagnostics/accent-map-*.json
+          if-no-files-found: ignore
+          retention-days: 14
           compression-level: 0
       - name: Sign Universal APKs
         run: |
@@ -740,13 +779,22 @@ jobs:
         if: github.ref != 'refs/heads/main'
         uses: actions/upload-artifact@v6
         with:
-          name: tiktok-ultramod-prototype
-          path: |
-            tiktok-rv-*.apk
-            color-audit-*.txt.gz
-            accent-map-*.json
+          name: tiktok-ultramod-apk
+          path: tiktok-rv-*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload prototype color analysis
+        if: github.ref != 'refs/heads/main'
+        uses: actions/upload-artifact@v6
+        with:
+          name: tiktok-ultramod-color-analysis
+          path: |
+            color-audit-*.txt.gz
+            accent-map-*.json
+          if-no-files-found: ignore
+          retention-days: 14
+          compression-level: 0
 
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main'
