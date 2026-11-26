@@ -1,6 +1,11 @@
 name: Automate TikTok Patching
 
 on:
+  push:
+    branches:
+      - ultramod/safe-47.9.3-build
+    paths:
+      - .github/workflows/tiktok-patcher.yml
   schedule:
     - cron: "0 0 */14 * *" # Run every 14 days
   workflow_dispatch: # Allow manual trigger
@@ -58,8 +63,8 @@ jobs:
 
     env:
       BUILD_VARIANT: ${{ github.event.inputs.variant || 'original' }}
-      VERSION_MODE: ${{ github.event.inputs.version_mode || 'auto' }}
-      TIKTOK_VERSION: ${{ github.event.inputs.tiktok_version || '' }}
+      VERSION_MODE: ${{ github.event.inputs.version_mode || 'manual' }}
+      TIKTOK_VERSION: ${{ github.event.inputs.tiktok_version || '47.9.3' }}
       ACCENT_PRESET: ${{ github.event.inputs.accent_preset || 'original' }}
       CUSTOM_ACCENT_HEX: ${{ github.event.inputs.accent_hex || '' }}
 
@@ -621,7 +626,7 @@ jobs:
             # TikTok 47.9.3 DEX. Select it only for the original package, and make a
             # fingerprint mismatch fatal so an unsupported upstream version is never shipped.
             PROFILE_BACKGROUND_ARGS=()
-            REQUIRED_PATCH_PATTERN='Settings|BytecodePatch@.*'
+            REQUIRED_PATCH_PATTERN='Settings|BytecodePatch@.*|Show seekbar'
             if [ "$VARIANT" = "original" ]; then
               PROFILE_BACKGROUND_ARGS=(-e "Profile background")
               REQUIRED_PATCH_PATTERN="${REQUIRED_PATCH_PATTERN}|Profile background"
@@ -636,11 +641,9 @@ jobs:
               -e "Settings" \
               -e "Feed filter" \
               -e "Downloads" \
-              -e "SIM spoof" \
               -e "Remember clear display" \
               -e "Show seekbar" \
               -e "Playback speed" \
-              -e "Disable login requirement" \
               "${PROFILE_BACKGROUND_ARGS[@]}" \
               "$PATCH_INPUT" 2>&1 | tee "$PATCH_LOG"
 
