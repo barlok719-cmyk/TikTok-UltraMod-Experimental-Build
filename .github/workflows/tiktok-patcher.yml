@@ -17,7 +17,7 @@ on:
       version_mode:
         description: "TikTok version source (automatic or manually pinned)"
         required: false
-        default: "auto"
+        default: "manual"
         type: choice
         options:
           - auto
@@ -25,7 +25,7 @@ on:
       tiktok_version:
         description: "Exact TikTok version for manual mode (example: 47.9.3)"
         required: false
-        default: ""
+        default: "47.9.3"
         type: string
       accent_preset:
         description: "Main TikTok accent color preset"
