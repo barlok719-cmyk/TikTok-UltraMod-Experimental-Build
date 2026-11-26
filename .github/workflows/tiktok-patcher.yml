@@ -696,13 +696,13 @@ jobs:
           for FILE in patch-original.log failed-patches-original.txt; do
             if [ -s "$FILE" ]; then cp "$FILE" diagnostics/; fi
           done
-          for FILE in color-audit-full-original.txt.gz color-audit-original.txt.gz color-audit-original.txt.gz.info accent-map-original.json; do
+          for FILE in color-audit-full-original.txt.gz color-audit-original.txt.gz color-audit-original.txt.info accent-map-original.json; do
             if [ -s "$FILE" ]; then cp "$FILE" diagnostics/; fi
           done
 
           # Record source split inventory without retaining the split APK files.
           if [ -d tiktok_original_dl ]; then
-            find tiktok_original_dl -maxdepth 1 -type f -printf '%f | %s bytes\\n' \
+            find tiktok_original_dl -maxdepth 1 -type f -printf '%f | %s bytes\n' \
               | sort > diagnostics/source-apk-inventory.txt
           fi
 
@@ -728,6 +728,7 @@ jobs:
           path: |
             diagnostics/color-audit-*.txt.gz
             diagnostics/accent-map-*.json
+            diagnostics/color-audit-original.txt.info
           if-no-files-found: ignore
           retention-days: 14
           compression-level: 0
