@@ -588,6 +588,14 @@ jobs:
               rm -f "$FULL_AUDIT" "$COMPACT_AUDIT"
             fi
 
+            # Disassemble only DEX files carrying the seekbar/profile-background fingerprints.
+            # The report and relevant Smali classes are uploaded even when a patch later fails.
+            DEX_DIAGNOSTICS="dex-diagnostics-${VARIANT}"
+            python3 -m tools.tiktok_accent.dex_diagnostics "$RAW_MERGED" \
+              --smali-jar tools/apktool-cli.jar \
+              --output "$DEX_DIAGNOSTICS" \
+              || echo "::warning::DEX fingerprint diagnostics did not complete for $VARIANT."
+
             PATCH_INPUT="$RAW_MERGED"
             if [ "$ACCENT_HEX" != "FE2C55" ]; then
               PATCH_INPUT="accented-merged-${VARIANT}.apk"
@@ -700,6 +708,10 @@ jobs:
             if [ -s "$FILE" ]; then cp "$FILE" diagnostics/; fi
           done
 
+          for DIR in dex-diagnostics-original dex-diagnostics-asia; do
+            if [ -d "$DIR" ]; then cp -R "$DIR" diagnostics/; fi
+          done
+
           # Record source split inventory without retaining the split APK files.
           if [ -d tiktok_original_dl ]; then
             find tiktok_original_dl -maxdepth 1 -type f -printf '%f | %s bytes\n' \
@@ -732,6 +744,16 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
           compression-level: 0
+      - name: Upload DEX fingerprint analysis
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tiktok-dex-fingerprint-analysis
+          path: diagnostics/dex-diagnostics-*/
+          if-no-files-found: ignore
+          retention-days: 14
+          compression-level: 6
+
       - name: Sign Universal APKs
         run: |
           echo "${{ secrets.KEYSTORE_B64 }}" | base64 --decode > new.keystore
