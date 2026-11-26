@@ -24,17 +24,21 @@ jobs:
             echo "::error::Add SOURCE_REPO_TOKEN in Settings > Secrets and variables > Actions."
             exit 1
           fi
+          SOURCE_DIR="$RUNNER_TEMP/tiktok-ultramod-source"
+          rm -rf "$SOURCE_DIR"
           git clone --depth 1 --single-branch --branch ultramod/experimental \
-            "https://barlok719-cmyk:${SOURCE_REPO_TOKEN}@github.com/barlok719-cmyk/tiktok-rv-private.git" source
+            "https://barlok719-cmyk:${SOURCE_REPO_TOKEN}@github.com/barlok719-cmyk/tiktok-rv-private.git" "$SOURCE_DIR"
 
       - name: Copy experimental source tree
         run: |
           set -euo pipefail
-          rsync -a --delete --exclude='.git/' --exclude='revanced-patches/local.properties' source/ ./
+          SOURCE_DIR="$RUNNER_TEMP/tiktok-ultramod-source"
+          test -d "$SOURCE_DIR/.git"
+          rsync -a --delete --exclude='.git/' --exclude='revanced-patches/local.properties' "$SOURCE_DIR/" "$GITHUB_WORKSPACE/"
           test -f .github/workflows/tiktok-patcher.yml
           test -f revanced-patches/settings.gradle.kts
           test -d revanced-patches/patches
-          rm -rf source
+          echo "Source tree copied and required project files verified."
 
       - name: Commit imported tree
         run: |
