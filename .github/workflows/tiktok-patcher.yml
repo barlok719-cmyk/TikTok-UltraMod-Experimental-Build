@@ -508,9 +508,12 @@ jobs:
 
       - name: Download ReVanced CLI
         run: |
-          URL=$(curl -s https://api.github.com/repos/ReVanced/revanced-cli/releases/latest | grep "browser_download_url.*\.jar" | grep -v "\.sig" | cut -d '"' -f 4)
-          echo "Downloading ReVanced CLI from: $URL"
-          wget "$URL" -O revanced-cli.jar
+          set -euo pipefail
+          URL="https://github.com/ReVanced/revanced-cli/releases/download/v6.0.0/revanced-cli-6.0.0-all.jar"
+          echo "Downloading pinned ReVanced CLI v6.0.0..."
+          curl -fL --retry 3 --retry-delay 2 "$URL" -o revanced-cli.jar
+          test -s revanced-cli.jar
+          java -jar revanced-cli.jar --version
 
       - name: Download APKEditor and DEX toolchain
         run: |
