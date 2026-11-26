@@ -31,7 +31,6 @@ import java.nio.charset.StandardCharsets;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -391,7 +390,7 @@ public class UltraModSettingsFragment extends Fragment {
             String name = new Locale("", code).getDisplayCountry(russian);
             if (name != null && !name.trim().isEmpty()) countries.add(new Country(code, name));
         }
-        Collections.sort(countries, Comparator.comparing(country -> country.name));
+        Collections.sort(countries, (left, right) -> left.name.compareToIgnoreCase(right.name));
         shown.addAll(countries);
 
         LinearLayout wrapper = new LinearLayout(getActivity());
