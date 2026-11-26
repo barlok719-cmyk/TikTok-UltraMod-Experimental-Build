@@ -25,7 +25,7 @@ jobs:
             exit 1
           fi
           git clone --depth 1 --single-branch --branch ultramod/experimental \
-            "https://x-access-token:${SOURCE_REPO_TOKEN}@github.com/barlok719-cmyk/tiktok-rv-private.git" source
+            "https://barlok719-cmyk:${SOURCE_REPO_TOKEN}@github.com/barlok719-cmyk/tiktok-rv-private.git" source
 
       - name: Copy experimental source tree
         run: |
