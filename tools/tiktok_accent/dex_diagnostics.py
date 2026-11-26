@@ -40,10 +40,14 @@ def main() -> int:
     args.output.mkdir(parents=True, exist_ok=True)
     candidates_dir = args.output / "candidate-smali"
     candidates_dir.mkdir(exist_ok=True)
+    digest = hashlib.sha256()
+    with args.apk.open("rb") as apk_file:
+        for chunk in iter(lambda: apk_file.read(1024 * 1024), b""):
+            digest.update(chunk)
     report = [
         "TikTok DEX fingerprint diagnostics",
         f"APK: {args.apk.name}",
-        f"APK SHA256: {hashlib.sha256(args.apk.read_bytes()).hexdigest()}",
+        f"APK SHA256: {digest.hexdigest()}",
         "",
     ]
     apk = None
