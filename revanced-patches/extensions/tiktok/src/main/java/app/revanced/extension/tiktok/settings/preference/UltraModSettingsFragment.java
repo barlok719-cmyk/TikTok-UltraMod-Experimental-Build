@@ -179,8 +179,12 @@ public class UltraModSettingsFragment extends Fragment {
         TextView aboutSummary = text("Все основные функции мода собраны в одном месте.", 12, MUTED, Typeface.NORMAL);
         LinearLayout.LayoutParams aboutSummaryParams = new LinearLayout.LayoutParams(-1, -2);
         aboutSummaryParams.topMargin = dp(6);
+        TextView aboutVersion = text("Tik-Tok Ultra Mod · версия 1.1", 11, MUTED, Typeface.NORMAL);
+        LinearLayout.LayoutParams aboutVersionParams = new LinearLayout.LayoutParams(-1, -2);
+        aboutVersionParams.topMargin = dp(8);
         about.addView(aboutTitle);
         about.addView(aboutSummary, aboutSummaryParams);
+        about.addView(aboutVersion, aboutVersionParams);
         content.addView(about, new LinearLayout.LayoutParams(-1, -2));
         TextView version = text("TIKTOK ULTRAMOD  ·  ВЕРСИЯ 1.0", 10, MUTED, Typeface.BOLD);
         version.setGravity(Gravity.CENTER);
