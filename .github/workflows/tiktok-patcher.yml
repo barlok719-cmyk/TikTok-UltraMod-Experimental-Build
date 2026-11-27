@@ -1,5 +1,5 @@
 name: Automate TikTok Patching
-# Consolidated 47.9.3 runtime-fix build: seekbar experiment polarity + About layout.
+# Tik-Tok Ultra Mod 1.1 — country/operator picker pages, seekbar and About layout fixes.
 
 on:
   push:
