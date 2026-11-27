@@ -12,17 +12,13 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
-import android.widget.ListView;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -106,7 +102,13 @@ public class UltraModSettingsFragment extends Fragment {
         back.setGravity(Gravity.CENTER);
         back.setVisibility(PAGE_HOME.equals(currentPage) ? View.INVISIBLE : View.VISIBLE);
         toolbar.addView(back, new LinearLayout.LayoutParams(dp(38), dp(44)));
-        back.setOnClickListener(v -> showPage(PAGE_HOME));
+        back.setOnClickListener(v -> {
+            if ("country-picker".equals(currentPage) || "operator-picker".equals(currentPage)) {
+                showPage("region");
+            } else {
+                showPage(PAGE_HOME);
+            }
+        });
 
         LinearLayout titleBox = new LinearLayout(context);
         titleBox.setOrientation(LinearLayout.VERTICAL);
@@ -145,7 +147,8 @@ public class UltraModSettingsFragment extends Fragment {
 
     private boolean isKnownPage(String page) {
         return PAGE_HOME.equals(page) || "feed".equals(page) || "downloads".equals(page)
-                || "region".equals(page) || "more".equals(page);
+                || "region".equals(page) || "more".equals(page)
+                || "country-picker".equals(page) || "operator-picker".equals(page);
     }
 
     private void showPage(String page) {
@@ -263,7 +266,11 @@ public class UltraModSettingsFragment extends Fragment {
         intro.setPadding(dp(2), 0, dp(2), dp(18));
         content.addView(intro);
 
-        if ("feed".equals(page)) {
+        if ("country-picker".equals(page)) {
+            buildCountryPickerPage();
+        } else if ("operator-picker".equals(page)) {
+            buildOperatorPickerPage();
+        } else if ("feed".equals(page)) {
             addSectionLabel("ФИЛЬТРАЦИЯ ЛЕНТЫ");
             addToggle("Убирать рекламу из ленты", "Скрывать рекламные публикации.", Settings.REMOVE_ADS);
             addToggle("Автоматически пропускать рекламу", "Автоматически пролистывать рекламу, если она появилась.", Settings.SKIP_ADS_AT_RENDER);
@@ -278,8 +285,10 @@ public class UltraModSettingsFragment extends Fragment {
         } else if ("region".equals(page)) {
             addSectionLabel("ПОДМЕНА РЕГИОНА");
             addToggle("Подменять данные SIM-карты", "Использовать заданные данные SIM-карты.", Settings.SIM_SPOOF);
-            addActionRow("Страна", countryName(Settings.SIM_SPOOF_ISO.get()), "Выбрать страну из списка", this::showCountryPicker);
-            addActionRow("Оператор", Settings.SIMSPOOF_OP_NAME.get(), "Выбрать оператора для текущей страны", this::showOperatorPicker);
+            addActionRow("Страна", countryFlag(Settings.SIM_SPOOF_ISO.get()) + "  " + countryName(Settings.SIM_SPOOF_ISO.get()), "Открыть каталог стран", this::showCountryPicker);
+            String selectedOperator = Settings.SIMSPOOF_OP_NAME.get();
+            addActionRow("Оператор", selectedOperator == null || selectedOperator.trim().isEmpty()
+                    ? "Не выбран" : selectedOperator, "Открыть каталог операторов", this::showOperatorPicker);
             addActionRow("Код мобильной сети (MCC+MNC)", Settings.SIMSPOOF_MCCMNC.get(), "Идентификатор страны и оператора", () -> editString("Код мобильной сети", Settings.SIMSPOOF_MCCMNC, InputType.TYPE_CLASS_NUMBER));
             addActionRow("Название оператора", Settings.SIMSPOOF_OP_NAME.get(), "Название мобильного оператора", () -> editString("Название оператора", Settings.SIMSPOOF_OP_NAME, InputType.TYPE_CLASS_TEXT));
             addInfo("Справочник операторов работает офлайн. При выборе оператора страна, MCC+MNC и название сохраняются вместе.");
@@ -390,154 +399,216 @@ public class UltraModSettingsFragment extends Fragment {
     }
 
     private void showCountryPicker() {
-        final String[] codes = Locale.getISOCountries();
+        showPage("country-picker");
+    }
+
+    private void showOperatorPicker() {
+        showPage("operator-picker");
+    }
+
+    private void buildCountryPickerPage() {
+        addSectionLabel("ВЫБОР СТРАНЫ");
+        addInfo("Найди страну по названию или двухбуквенному коду. Флаг отображается средствами Android.");
+        EditText search = pickerSearch("Поиск страны");
+        LinearLayout rows = new LinearLayout(getActivity());
+        rows.setOrientation(LinearLayout.VERTICAL);
+        content.addView(search, pickerSearchParams());
+        content.addView(rows);
+
         final List<Country> countries = new ArrayList<>();
-        final List<Country> shown = new ArrayList<>();
-        final Locale russian = new Locale("ru");
-        for (String code : codes) {
+        Locale russian = new Locale("ru");
+        for (String code : Locale.getISOCountries()) {
             String name = new Locale("", code).getDisplayCountry(russian);
             if (name != null && !name.trim().isEmpty()) countries.add(new Country(code, name));
         }
         Collections.sort(countries, (left, right) -> left.name.compareToIgnoreCase(right.name));
-        shown.addAll(countries);
 
-        LinearLayout wrapper = new LinearLayout(getActivity());
-        wrapper.setOrientation(LinearLayout.VERTICAL);
-        wrapper.setPadding(dp(18), dp(8), dp(18), dp(4));
-        EditText search = new EditText(getActivity());
-        search.setSingleLine(true);
-        search.setHint("Поиск страны");
-        search.setCompoundDrawablePadding(dp(8));
-        wrapper.addView(search, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView empty = text("Ничего не найдено", 13, MUTED, Typeface.NORMAL);
-        empty.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(-1, pickerListHeight());
-        emptyParams.topMargin = dp(8);
-        wrapper.addView(empty, emptyParams);
-
-        ListView list = new ListView(getActivity());
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(getActivity(),
-                android.R.layout.simple_list_item_1, new ArrayList<String>());
-        list.setAdapter(adapter);
-        list.setEmptyView(empty);
-        LinearLayout.LayoutParams listParams = new LinearLayout.LayoutParams(-1, pickerListHeight());
-        listParams.topMargin = dp(8);
-        wrapper.addView(list, listParams);
-
-        Runnable refresh = () -> {
-            String query = search.getText().toString().trim().toLowerCase(russian);
-            shown.clear();
-            adapter.clear();
-            for (Country country : countries) {
-                String label = country.name + "  ·  " + country.code.toUpperCase(Locale.US);
-                if (query.isEmpty() || country.name.toLowerCase(russian).contains(query)
-                        || country.code.toLowerCase(Locale.US).contains(query)) {
-                    shown.add(country);
-                    adapter.add(label);
-                }
-            }
-            adapter.notifyDataSetChanged();
-        };
+        Runnable refresh = () -> renderCountryRows(rows, countries, search.getText().toString());
         refresh.run();
         search.addTextChangedListener(new android.text.TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { refresh.run(); }
-            @Override public void afterTextChanged(android.text.Editable s) { }
+            @Override public void beforeTextChanged(CharSequence value, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence value, int start, int before, int count) { refresh.run(); }
+            @Override public void afterTextChanged(android.text.Editable value) { }
         });
-
-        final AlertDialog dialog = new AlertDialog.Builder(getActivity())
-                .setTitle("Выберите страну")
-                .setView(wrapper)
-                .setNegativeButton("Закрыть", null)
-                .create();
-        list.setOnItemClickListener((parent, view, position, id) -> {
-            Country country = shown.get(position);
-            Settings.SIM_SPOOF_ISO.save(country.code.toLowerCase(Locale.US));
-            dialog.dismiss();
-            showPage("region");
-            Toast.makeText(getActivity(),
-                    "Страна сохранена. Выберите оператора для обновления MCC+MNC.",
-                    Toast.LENGTH_LONG).show();
-        });
-        dialog.show();
     }
 
-    private void showOperatorPicker() {
-        final String iso = Settings.SIM_SPOOF_ISO.get();
+    private void renderCountryRows(LinearLayout rows, List<Country> countries, String rawQuery) {
+        rows.removeAllViews();
+        String query = rawQuery == null ? "" : rawQuery.trim().toLowerCase(new Locale("ru"));
+        String selectedIso = Settings.SIM_SPOOF_ISO.get();
+        int matches = 0;
+        for (Country country : countries) {
+            String code = country.code.toUpperCase(Locale.US);
+            if (!query.isEmpty() && !country.name.toLowerCase(new Locale("ru")).contains(query)
+                    && !code.toLowerCase(Locale.US).contains(query)) continue;
+            matches++;
+            LinearLayout row = panel();
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            TextView flag = text(countryFlag(country.code), 27, TEXT, Typeface.NORMAL);
+            flag.setGravity(Gravity.CENTER);
+            row.addView(flag, new LinearLayout.LayoutParams(dp(46), dp(42)));
+
+            LinearLayout labels = new LinearLayout(getActivity());
+            labels.setOrientation(LinearLayout.VERTICAL);
+            labels.addView(text(country.name, 14, TEXT, Typeface.BOLD));
+            TextView codeLabel = text(code, 10, MUTED, Typeface.BOLD);
+            codeLabel.setLetterSpacing(0.10f);
+            LinearLayout.LayoutParams codeParams = new LinearLayout.LayoutParams(-1, -2);
+            codeParams.topMargin = dp(3);
+            labels.addView(codeLabel, codeParams);
+            row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
+
+            if (country.code.equalsIgnoreCase(selectedIso)) {
+                TextView selected = text("ВЫБРАНА", 9, ACCENT, Typeface.BOLD);
+                selected.setLetterSpacing(0.05f);
+                row.addView(selected);
+            } else {
+                row.addView(text("›", 24, ACCENT, Typeface.NORMAL));
+            }
+
+            row.setClickable(true);
+            row.setFocusable(true);
+            row.setOnClickListener(v -> {
+                String newIso = country.code.toLowerCase(Locale.US);
+                String oldIso = Settings.SIM_SPOOF_ISO.get();
+                if (oldIso == null || !newIso.equalsIgnoreCase(oldIso)) {
+                    Settings.SIM_SPOOF_ISO.save(newIso);
+                    // Do not leave an operator from the previous country displayed as selected.
+                    Settings.SIMSPOOF_MCCMNC.save("");
+                    Settings.SIMSPOOF_OP_NAME.save("");
+                }
+                showPage("operator-picker");
+            });
+            addPickerRow(row);
+        }
+        if (matches == 0) addInfo("По вашему запросу ничего не найдено.");
+    }
+
+    private void buildOperatorPickerPage() {
+        String iso = Settings.SIM_SPOOF_ISO.get();
+        addSectionLabel("ВЫБОР ОПЕРАТОРА");
+        LinearLayout countryHeader = panel();
+        countryHeader.setOrientation(LinearLayout.HORIZONTAL);
+        TextView flag = text(countryFlag(iso), 28, TEXT, Typeface.NORMAL);
+        flag.setGravity(Gravity.CENTER);
+        countryHeader.addView(flag, new LinearLayout.LayoutParams(dp(48), dp(44)));
+        LinearLayout countryLabels = new LinearLayout(getActivity());
+        countryLabels.setOrientation(LinearLayout.VERTICAL);
+        countryLabels.addView(text(countryName(iso), 14, TEXT, Typeface.BOLD));
+        countryLabels.addView(text("Страна · " + (iso == null ? "--" : iso.toUpperCase(Locale.US)), 10, MUTED, Typeface.BOLD));
+        LinearLayout.LayoutParams countryLabelParams = new LinearLayout.LayoutParams(0, -2, 1);
+        countryHeader.addView(countryLabels, countryLabelParams);
+        content.addView(countryHeader, pickerRowParams());
+
         final List<SimOperator> operators;
         try {
             operators = loadOperators(iso);
         } catch (Exception error) {
-            Toast.makeText(getActivity(), "Не удалось прочитать справочник операторов", Toast.LENGTH_LONG).show();
+            addInfo("Не удалось прочитать локальный справочник операторов. Проверьте, что файл networks.min.json включён в assets сборки. Детали: "
+                    + error.getClass().getSimpleName());
             return;
         }
         if (operators.isEmpty()) {
-            Toast.makeText(getActivity(), "Для выбранной страны операторы не найдены", Toast.LENGTH_SHORT).show();
+            addInfo("В справочнике нет записей для этой страны. Можно вернуться назад и выбрать другую страну.");
             return;
         }
 
-        final List<SimOperator> shown = new ArrayList<>(operators);
-        LinearLayout wrapper = new LinearLayout(getActivity());
-        wrapper.setOrientation(LinearLayout.VERTICAL);
-        wrapper.setPadding(dp(18), dp(8), dp(18), dp(4));
-        EditText search = new EditText(getActivity());
-        search.setSingleLine(true);
-        search.setHint("Поиск оператора или MCC+MNC");
-        wrapper.addView(search, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView empty = text("Ничего не найдено", 13, MUTED, Typeface.NORMAL);
-        empty.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(-1, pickerListHeight());
-        emptyParams.topMargin = dp(8);
-        wrapper.addView(empty, emptyParams);
-
-        ListView list = new ListView(getActivity());
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(getActivity(),
-                android.R.layout.simple_list_item_1, new ArrayList<String>());
-        list.setAdapter(adapter);
-        list.setEmptyView(empty);
-        LinearLayout.LayoutParams listParams = new LinearLayout.LayoutParams(-1, pickerListHeight());
-        listParams.topMargin = dp(8);
-        wrapper.addView(list, listParams);
-
-        Runnable refresh = () -> {
-            String query = search.getText().toString().trim().toLowerCase(new Locale("ru"));
-            shown.clear();
-            adapter.clear();
-            for (SimOperator operator : operators) {
-                String statusLabel = operatorStatusLabel(operator.status);
-                String haystack = (operator.name + " " + operator.mccMnc + " "
-                        + operator.status + " " + statusLabel).toLowerCase(new Locale("ru"));
-                if (query.isEmpty() || haystack.contains(query)) {
-                    shown.add(operator);
-                    adapter.add(operator.name + "  ·  " + operator.mccMnc + "\n" + statusLabel);
-                }
-            }
-            adapter.notifyDataSetChanged();
-        };
+        EditText search = pickerSearch("Поиск оператора или MCC+MNC");
+        LinearLayout rows = new LinearLayout(getActivity());
+        rows.setOrientation(LinearLayout.VERTICAL);
+        content.addView(search, pickerSearchParams());
+        content.addView(rows);
+        Runnable refresh = () -> renderOperatorRows(rows, operators, search.getText().toString());
         refresh.run();
         search.addTextChangedListener(new android.text.TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { refresh.run(); }
-            @Override public void afterTextChanged(android.text.Editable s) { }
+            @Override public void beforeTextChanged(CharSequence value, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence value, int start, int before, int count) { refresh.run(); }
+            @Override public void afterTextChanged(android.text.Editable value) { }
         });
+    }
 
-        final AlertDialog dialog = new AlertDialog.Builder(getActivity())
-                .setTitle("Операторы · " + countryName(iso))
-                .setView(wrapper)
-                .setNegativeButton("Закрыть", null)
-                .create();
-        list.setOnItemClickListener((parent, view, position, id) -> {
-            SimOperator operator = shown.get(position);
-            Settings.SIM_SPOOF_ISO.save(iso.toLowerCase(Locale.US));
-            Settings.SIMSPOOF_MCCMNC.save(operator.mccMnc);
-            Settings.SIMSPOOF_OP_NAME.save(operator.name);
-            dialog.dismiss();
-            showPage("region");
-            Toast.makeText(getActivity(), "Оператор сохранён", Toast.LENGTH_SHORT).show();
-        });
-        dialog.show();
+    private void renderOperatorRows(LinearLayout rows, List<SimOperator> operators, String rawQuery) {
+        rows.removeAllViews();
+        String query = rawQuery == null ? "" : rawQuery.trim().toLowerCase(new Locale("ru"));
+        int matches = 0;
+        for (SimOperator operator : operators) {
+            String status = operatorStatusLabel(operator.status);
+            String haystack = (operator.name + " " + operator.mccMnc + " " + operator.status + " " + status)
+                    .toLowerCase(new Locale("ru"));
+            if (!query.isEmpty() && !haystack.contains(query)) continue;
+            matches++;
+
+            LinearLayout row = panel();
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            TextView mark = text(operator.name.substring(0, 1).toUpperCase(new Locale("ru")), 17, ACCENT, Typeface.BOLD);
+            mark.setGravity(Gravity.CENTER);
+            mark.setBackground(round(SURFACE_ALT, dp(13)));
+            row.addView(mark, new LinearLayout.LayoutParams(dp(42), dp(42)));
+
+            LinearLayout labels = new LinearLayout(getActivity());
+            labels.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(0, -2, 1);
+            labelsParams.leftMargin = dp(12);
+            labels.addView(text(operator.name, 14, TEXT, Typeface.BOLD));
+            TextView details = text("MCC+MNC  " + operator.mccMnc, 10, MUTED, Typeface.NORMAL);
+            LinearLayout.LayoutParams detailsParams = new LinearLayout.LayoutParams(-1, -2);
+            detailsParams.topMargin = dp(4);
+            labels.addView(details, detailsParams);
+            TextView state = text(status, 10, MUTED, Typeface.NORMAL);
+            LinearLayout.LayoutParams stateParams = new LinearLayout.LayoutParams(-1, -2);
+            stateParams.topMargin = dp(2);
+            labels.addView(state, stateParams);
+            row.addView(labels, labelsParams);
+            row.addView(text("›", 24, ACCENT, Typeface.NORMAL));
+
+            row.setClickable(true);
+            row.setFocusable(true);
+            row.setOnClickListener(v -> {
+                Settings.SIMSPOOF_MCCMNC.save(operator.mccMnc);
+                Settings.SIMSPOOF_OP_NAME.save(operator.name);
+                showPage("region");
+            });
+            addPickerRow(row);
+        }
+        if (matches == 0) addInfo("По вашему запросу ничего не найдено.");
+    }
+
+    private EditText pickerSearch(String hint) {
+        EditText search = new EditText(getActivity());
+        search.setSingleLine(true);
+        search.setTextSize(14);
+        search.setTextColor(TEXT);
+        search.setHintTextColor(MUTED);
+        search.setHint(hint);
+        search.setPadding(dp(14), dp(11), dp(14), dp(11));
+        search.setBackground(round(SURFACE_ALT, dp(13)));
+        search.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        return search;
+    }
+
+    private LinearLayout.LayoutParams pickerSearchParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.bottomMargin = dp(12);
+        return params;
+    }
+
+    private LinearLayout.LayoutParams pickerRowParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.bottomMargin = dp(9);
+        return params;
+    }
+
+    private void addPickerRow(View row) {
+        LinearLayout.LayoutParams params = pickerRowParams();
+        content.addView(row, params);
+    }
+
+    private String countryFlag(String iso) {
+        if (iso == null || !iso.matches("(?i)[a-z]{2}")) return "🌐";
+        String upper = iso.toUpperCase(Locale.US);
+        int first = 0x1F1E6 + upper.charAt(0) - 'A';
+        int second = 0x1F1E6 + upper.charAt(1) - 'A';
+        return new String(Character.toChars(first)) + new String(Character.toChars(second));
     }
 
     private String operatorStatusLabel(String status) {
@@ -754,6 +825,8 @@ public class UltraModSettingsFragment extends Fragment {
         if ("feed".equals(page)) return "Лента и фильтрация";
         if ("downloads".equals(page)) return "Загрузки";
         if ("region".equals(page)) return "Регион и страна";
+        if ("country-picker".equals(page)) return "Выбор страны";
+        if ("operator-picker".equals(page)) return "Выбор оператора";
         return "Дополнительно";
     }
 
@@ -761,6 +834,8 @@ public class UltraModSettingsFragment extends Fragment {
         if ("feed".equals(page)) return "Настрой, какие публикации и элементы будут отображаться в ленте.";
         if ("downloads".equals(page)) return "Управляй расположением сохранённых видео и водяным знаком.";
         if ("region".equals(page)) return "Настройки региона и данных мобильного оператора.";
+        if ("country-picker".equals(page)) return "Выбери страну из каталога.";
+        if ("operator-picker".equals(page)) return "Выбери оператора из локального справочника.";
         return "Полезные ссылки и дополнительные параметры расширения.";
     }
 
