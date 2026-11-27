@@ -479,7 +479,7 @@ public class UltraModSettingsFragment extends Fragment {
                 }
                 showPage("operator-picker");
             });
-            addPickerRow(row);
+            rows.addView(row, pickerRowParams());
         }
         if (matches == 0) addInfo("По вашему запросу ничего не найдено.");
     }
@@ -568,7 +568,7 @@ public class UltraModSettingsFragment extends Fragment {
                 Settings.SIMSPOOF_OP_NAME.save(operator.name);
                 showPage("region");
             });
-            addPickerRow(row);
+            rows.addView(row, pickerRowParams());
         }
         if (matches == 0) addInfo("По вашему запросу ничего не найдено.");
     }
@@ -639,7 +639,7 @@ public class UltraModSettingsFragment extends Fragment {
     private List<SimOperator> loadOperators(String iso) throws Exception {
         List<SimOperator> result = new ArrayList<>();
         if (iso == null || !iso.matches("(?i)[a-z]{2}")) return result;
-        try (InputStream input = getActivity().getAssets().open("networks.min.json");
+        try (InputStream input = NetworksData.open();
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];
             int read;
