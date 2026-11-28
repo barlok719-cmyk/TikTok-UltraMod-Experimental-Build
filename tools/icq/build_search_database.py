@@ -107,10 +107,10 @@ def main():
             owner = match.group(1).strip("L;") if match else ""
             if owner in focus:
                 target = focus_dir / (owner.replace("/", "_") + ".smali")
-                target.write_text("\\n".join(lines), encoding="utf-8")
+                target.write_text("\n".join(lines), encoding="utf-8")
                 copied.append((owner, str(target.relative_to(a.output))))
         (a.output / "focused-class-manifest.tsv").write_text(
-            "descriptor\\tfile\\n" + "".join(f"{owner}\\t{path}\\n" for owner, path in copied),
+            "descriptor\tfile\n" + "".join(f"{owner}\t{path}\n" for owner, path in copied),
             encoding="utf-8"
         )
         print(f"[focus] dumped {len(copied)}/{len(focus)} exact classes", flush=True)
