@@ -49,6 +49,7 @@ def main():
     ap.add_argument("--terms", required=True)
     ap.add_argument("--output", required=True, type=Path)
     ap.add_argument("--api", type=int, default=35)
+    ap.add_argument("--focus-classes", default="", help="Semicolon-separated exact class descriptors to dump, e.g. LX/0YtY;LX/1E00")
     a = ap.parse_args()
     sha = digest(a.apk)
     dex_count = disassemble(a.apk, a.jar, a.db, a.api)
@@ -91,6 +92,28 @@ def main():
             if pattern.search(owner) and len(class_hits[term]) < 500:
                 class_hits[term].append((owner, str(smali.relative_to(a.db))))
     a.output.mkdir(parents=True, exist_ok=True)
+    focus = {x.strip().strip("L;") for x in a.focus_classes.split(";") if x.strip()}
+    if focus:
+        focus_dir = a.output / "focused-smali"
+        focus_dir.mkdir(parents=True, exist_ok=True)
+        copied = []
+        for smali in sorted(a.db.rglob("*.smali")):
+            try:
+                lines = smali.read_text(encoding="utf-8", errors="ignore").splitlines()
+            except OSError:
+                continue
+            decl = next((x for x in lines[:30] if CLASS_RE.match(x)), "")
+            match = CLASS_RE.match(decl)
+            owner = match.group(1).strip("L;") if match else ""
+            if owner in focus:
+                target = focus_dir / (owner.replace("/", "_") + ".smali")
+                target.write_text("\\n".join(lines), encoding="utf-8")
+                copied.append((owner, str(target.relative_to(a.output))))
+        (a.output / "focused-class-manifest.tsv").write_text(
+            "descriptor\\tfile\\n" + "".join(f"{owner}\\t{path}\\n" for owner, path in copied),
+            encoding="utf-8"
+        )
+        print(f"[focus] dumped {len(copied)}/{len(focus)} exact classes", flush=True)
     report = [f"# ICQ multi-target DEX search (exact-token v2)\n\n- APK SHA-256: {sha}\n- DEX files: {dex_count}\n- Decoded classes: {class_count}\n- Methods: {method_count}\n- Invoke references scanned: {invoke_count}\n- Relevant invoke references retained: {len(invoke_rows)}\n- Search terms: {len(terms)}\n"]
     for term in terms:
         report.append(f"\n## {term}\n\nClass matches: {len(class_hits[term])}; method matches (capped at 150): {len(method_hits[term])}.\n")
