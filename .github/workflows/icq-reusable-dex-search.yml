@@ -6,7 +6,7 @@ on:
       terms:
         description: "Search terms separated by semicolons"
         required: true
-        default: "LX/0YtY;LX/1E00;LX/0Etl;LX/0EpN;TextContent;BaseContentParserKt;MessageListComponentFactoryImpl;MessageListSubmitListAbilityImpl;TextReceivePowerCell;TextBigEmojiReceivePowerCell;TextTranslateReceiveCell;MarkdownReceiverPowerCell;SpannableStringBuilder;ImageSpan"
+        default: "LX/1E00;LX/0YtY;LX/0N4f;LX/0EpN;BaseContentParserKt;TextContent;MessageListSubmitListAbilityImpl;MessageListComponentFactoryImpl;TextReceivePowerCell;TextBigEmojiReceivePowerCell;TextTranslateReceiveCell;MarkdownReceiverPowerCell;LX/1E00;LX/1E00;->LIZJ;LX/0YtY;->LIZ;BaseContentParserKt;->getOrParseJsonContent;getOrParseJsonContent;getRichTextInfos;getText;setText;TuxTextView"
         type: string
   push:
     branches:
@@ -66,7 +66,7 @@ jobs:
       - name: Build or reuse decoded DEX database and search
         env:
           JAVA_TOOL_OPTIONS: "-Xms512m -Xmx6g -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
-          TERMS: ${{ inputs.terms || 'LX/0YtY;LX/1E00;LX/0Etl;LX/0EpN;TextContent;BaseContentParserKt;MessageListComponentFactoryImpl;MessageListSubmitListAbilityImpl;TextReceivePowerCell;TextBigEmojiReceivePowerCell;TextTranslateReceiveCell;MarkdownReceiverPowerCell;SpannableStringBuilder;ImageSpan' }}
+          TERMS: ${{ inputs.terms || 'LX/1E00;LX/0YtY;LX/0N4f;LX/0EpN;BaseContentParserKt;TextContent;MessageListSubmitListAbilityImpl;MessageListComponentFactoryImpl;TextReceivePowerCell;TextBigEmojiReceivePowerCell;TextTranslateReceiveCell;MarkdownReceiverPowerCell;LX/1E00;->LIZJ;LX/0YtY;->LIZ;BaseContentParserKt;->getOrParseJsonContent;getOrParseJsonContent;getRichTextInfos;getText;setText;TuxTextView' }}
           FOCUS_CLASSES: 'LX/0YtY;LX/1E00;LX/0Etl;LX/0EpN;com/ss/android/ugc/aweme/im/message/content/TextContent;com/ss/android/ugc/aweme/im/messagelist/provider/MessageListComponentFactoryImpl;com/ss/android/ugc/aweme/im/messagelist/ui/MessageListSubmitListAbilityImpl'
         run: |
           set -euo pipefail
