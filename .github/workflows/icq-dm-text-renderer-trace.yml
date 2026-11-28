@@ -5,6 +5,12 @@ on:
   push:
     branches:
       - icq-text-renderer-trace
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - icq-text-renderer-trace
     paths:
       - ".github/workflows/icq-text-renderer-trace.yml"
 
