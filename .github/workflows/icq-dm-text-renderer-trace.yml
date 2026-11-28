@@ -1,6 +1,7 @@
 name: ICQ DM Text Renderer Trace
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - icq-text-renderer-trace
