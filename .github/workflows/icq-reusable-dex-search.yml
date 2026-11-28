@@ -1,0 +1,90 @@
+name: ICQ Reusable DEX Search Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      terms:
+        description: "Search terms separated by semicolons"
+        required: true
+        default: "TextView;TuxTextView;TextContent;MessageList;PowerCell;IMSkeletonLayoutReusedUISlotAssem;StickerTemplate;MessageListStickerClickAbility;SpannableStringBuilder;ImageSpan;setText;getText;RichTextInfo;TextReceivePowerCell;MessageListProtocolEnum"
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Locate latest successful experimental APK
+        id: apk
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow tiktok-patcher.yml --branch ultramod/experimental-full-build --status success --limit 20 --json databaseId --jq '.[0].databaseId')"
+          test -n "$RUN_ID" && test "$RUN_ID" != null
+          mkdir -p "$RUNNER_TEMP/apk"
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name tiktok-ultramod-apk --dir "$RUNNER_TEMP/apk"
+          mapfile -t APKS < <(find "$RUNNER_TEMP/apk" -type f -name '*.apk')
+          test "${#APKS[@]}" -eq 1
+          echo "apk_path=${APKS[0]}" >> "$GITHUB_OUTPUT"
+          echo "build_run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "apk_sha=$(sha256sum "${APKS[0]}" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Restore decoded DEX database
+        id: dex-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/icq-smali-db
+          key: icq-smali-v1-${{ steps.apk.outputs.apk_sha }}
+      - name: Checkout private research source
+        if: steps.dex-cache.outputs.cache-hit != 'true'
+        env:
+          SOURCE_REPO_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          AUTH="$(printf 'x-access-token:%s' "$SOURCE_REPO_TOKEN" | base64 -w0)"
+          git -c "http.extraheader=AUTHORIZATION: basic $AUTH" clone --filter=blob:none --depth 1 --single-branch --branch ultramod/next https://github.com/barlok719-cmyk/tiktok-rv-private.git "$RUNNER_TEMP/private"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Download pinned apktool with retry
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            if curl -fL --retry 2 --retry-delay 3 https://repo.maven.apache.org/maven2/org/apktool/apktool-cli/3.0.3/apktool-cli-3.0.3.jar -o "$RUNNER_TEMP/apktool-cli.jar"; then break; fi
+            sleep $((i*5))
+          done
+          test -s "$RUNNER_TEMP/apktool-cli.jar"
+      - name: Build or reuse decoded DEX database and search
+        env:
+          JAVA_TOOL_OPTIONS: "-Xms512m -Xmx6g -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
+          TERMS: ${{ inputs.terms }}
+        run: |
+          set -euo pipefail
+          if [ ! -f "$RUNNER_TEMP/icq-smali-db/classes/.complete" ] && [ -z "$(find "$RUNNER_TEMP/icq-smali-db" -name .complete -print -quit 2>/dev/null || true)" ]; then
+            echo "Cache empty: decode once."
+          else
+            echo "Decoded DEX cache found; no APK disassembly will be repeated."
+          fi
+          python3 -u tools/build_search_database.py \
+            --apk "${{ steps.apk.outputs.apk_path }}" \
+            --jar "$RUNNER_TEMP/apktool-cli.jar" \
+            --db "$RUNNER_TEMP/icq-smali-db" \
+            --terms "$TERMS" \
+            --output "$RUNNER_TEMP/search-results" \
+            --api 35
+      - uses: actions/upload-artifact@v4
+        with:
+          name: icq-multi-target-search-${{ github.run_id }}
+          path: ${{ runner.temp }}/search-results/
+          if-no-files-found: error
+          retention-days: 30
