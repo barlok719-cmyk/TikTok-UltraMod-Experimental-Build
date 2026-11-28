@@ -8,6 +8,12 @@ on:
         required: true
         default: "TextView;TuxTextView;TextContent;MessageList;PowerCell;IMSkeletonLayoutReusedUISlotAssem;StickerTemplate;MessageListStickerClickAbility;SpannableStringBuilder;ImageSpan;setText;getText;RichTextInfo;TextReceivePowerCell;MessageListProtocolEnum"
         type: string
+  push:
+    branches:
+      - icq-search-database
+    paths:
+      - ".github/workflows/icq-reusable-dex-search.yml"
+      - "tools/icq/build_search_database.py"
 
 permissions:
   actions: read
@@ -32,23 +38,16 @@ jobs:
           gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name tiktok-ultramod-apk --dir "$RUNNER_TEMP/apk"
           mapfile -t APKS < <(find "$RUNNER_TEMP/apk" -type f -name '*.apk')
           test "${#APKS[@]}" -eq 1
+          APK_SHA="$(sha256sum "${APKS[0]}" | awk '{print $1}')"
           echo "apk_path=${APKS[0]}" >> "$GITHUB_OUTPUT"
           echo "build_run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "apk_sha=$(sha256sum "${APKS[0]}" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "apk_sha=$APK_SHA" >> "$GITHUB_OUTPUT"
       - name: Restore decoded DEX database
         id: dex-cache
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/icq-smali-db
           key: icq-smali-v1-${{ steps.apk.outputs.apk_sha }}
-      - name: Checkout private research source
-        if: steps.dex-cache.outputs.cache-hit != 'true'
-        env:
-          SOURCE_REPO_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
-        run: |
-          set -euo pipefail
-          AUTH="$(printf 'x-access-token:%s' "$SOURCE_REPO_TOKEN" | base64 -w0)"
-          git -c "http.extraheader=AUTHORIZATION: basic $AUTH" clone --filter=blob:none --depth 1 --single-branch --branch ultramod/next https://github.com/barlok719-cmyk/tiktok-rv-private.git "$RUNNER_TEMP/private"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -67,15 +66,15 @@ jobs:
       - name: Build or reuse decoded DEX database and search
         env:
           JAVA_TOOL_OPTIONS: "-Xms512m -Xmx6g -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
-          TERMS: ${{ inputs.terms }}
+          TERMS: ${{ inputs.terms || 'TextView;TuxTextView;TextContent;MessageList;PowerCell;IMSkeletonLayoutReusedUISlotAssem;StickerTemplate;MessageListStickerClickAbility;SpannableStringBuilder;ImageSpan;setText;getText;RichTextInfo;TextReceivePowerCell;MessageListProtocolEnum' }}
         run: |
           set -euo pipefail
-          if [ ! -f "$RUNNER_TEMP/icq-smali-db/classes/.complete" ] && [ -z "$(find "$RUNNER_TEMP/icq-smali-db" -name .complete -print -quit 2>/dev/null || true)" ]; then
-            echo "Cache empty: decode once."
+          if [ -n "$(find "$RUNNER_TEMP/icq-smali-db" -name .complete -print -quit 2>/dev/null || true)" ]; then
+            echo "Decoded DEX cache found. Reusing it; no APK disassembly."
           else
-            echo "Decoded DEX cache found; no APK disassembly will be repeated."
+            echo "No decoded DEX cache found. This run will create it once."
           fi
-          python3 -u tools/build_search_database.py \
+          python3 -u tools/icq/build_search_database.py \
             --apk "${{ steps.apk.outputs.apk_path }}" \
             --jar "$RUNNER_TEMP/apktool-cli.jar" \
             --db "$RUNNER_TEMP/icq-smali-db" \
