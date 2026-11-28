@@ -67,7 +67,7 @@ jobs:
         env:
           JAVA_TOOL_OPTIONS: "-Xms512m -Xmx6g -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
           TERMS: ${{ inputs.terms || 'LX/1E00;LX/0YtY;LX/0N4f;LX/0EpN;BaseContentParserKt;TextContent;MessageListSubmitListAbilityImpl;MessageListComponentFactoryImpl;TextReceivePowerCell;TextBigEmojiReceivePowerCell;TextTranslateReceiveCell;MarkdownReceiverPowerCell;LX/1E00;->LIZJ;LX/0YtY;->LIZ;BaseContentParserKt;->getOrParseJsonContent;getOrParseJsonContent;getRichTextInfos;getText;setText;TuxTextView' }}
-          FOCUS_CLASSES: 'LX/0YtY;LX/1E00;LX/0Etl;LX/0EpN;com/ss/android/ugc/aweme/im/message/content/TextContent;com/ss/android/ugc/aweme/im/messagelist/provider/MessageListComponentFactoryImpl;com/ss/android/ugc/aweme/im/messagelist/ui/MessageListSubmitListAbilityImpl'
+          FOCUS_CLASSES: 'LX/0Yok;LX/0Yol;LX/0Yom;LX/0Yon;LX/0Ymv;LX/0NAI;LX/0NAJ;LX/0NBI;LX/0NAA;LX/0NAF;LX/0YtY;LX/1E00;LX/0Etl;LX/0EpN;com/ss/android/ugc/aweme/im/message/content/TextContent;com/ss/android/ugc/aweme/im/messagelist/provider/MessageListComponentFactoryImpl;com/ss/android/ugc/aweme/im/messagelist/ui/MessageListSubmitListAbilityImpl'
         run: |
           set -euo pipefail
           if [ -n "$(find "$RUNNER_TEMP/icq-smali-db" -name .complete -print -quit 2>/dev/null || true)" ]; then
