@@ -60,7 +60,7 @@ jobs:
           jar=Path(os.environ["RUNNER_TEMP"])/"apktool-cli.jar"
           out=Path(os.environ["RUNNER_TEMP"])/"trace"
           out.mkdir()
-          targets=("TextTranslateReceiveCell","TextTranslateReceiveAssem","TextTranslateSendCell","TextTranslateAssem","TextContent","0NHW","0NHV","0Yp0","0NHc","0NHd")
+          targets=("TextTranslateReceiveCell","TextTranslateReceiveAssem","TextTranslateSendCell","TextTranslateAssem","TextContent","0NHW","0NHV","0Yp0","0NHc","0NHd","MessageListSubmitListAbilityImpl","MessageListComponentFactoryImpl","MessageListAdapter","MessageListAdapterV2","MessageListViewHolder","MessageViewHolder","BaseMessageViewHolder","MessageCellFactory","MessageContentAssem","ReceiveMessage","ReceiveCell","ReceivePowerCell","TextReceivePowerCell","IMSkeletonLayoutPowerCell","SkeletonLayoutAssembler","SkeletonLayoutAssemblerBridge","BaseSkeletonData","0N4f","0N4I","0N3f","0N3t","0N4a","0N4b","0NBI","0NAA","0NAB","0NCk","0Yon","0NHV","0N1z","IMMessageListProtocol","SkeletonMessageListProtocol","MessageListProtocolEnum","TextContent")
           class_rx=re.compile(r"^\.class\b.*?\s(L[^;]+;)")
           method_rx=re.compile(r"^\.method\b")
           classes={}
@@ -88,13 +88,15 @@ jobs:
                       methods.append(cur); cur=None
                 if cur: methods.append(cur)
                 simple=desc.rsplit("/",1)[-1].rstrip(";") if desc else f.stem
-                if any(t in simple for t in targets):
+                head="\n".join(lines[:180])
+                is_protocol_impl=("IMMessageListProtocol;" in head or "SkeletonMessageListProtocol;" in head)
+                if any(t in simple for t in targets) or is_protocol_impl:
                   classes[(name,simple)]="\n".join(lines)
                 for body in methods:
                   txt="\n".join(body)
-                  if any(t in txt for t in targets):
+                  if any(t in txt for t in targets) or ("msgType" in txt and "/im/" in (desc or "")):
                     callers.append((name,desc,body))
-                  if ("/im/" in (desc or "") and ("TextContent;" in txt or "getText()Ljava/lang/String;" in txt) and re.search(r"(?:TextView|TuxTextView|AppCompatTextView);->setText\(|setText\(|SpannableString|setSpan\(",txt)):
+                  if ("/im/" in (desc or "") and (("TextContent;" in txt or "getText()Ljava/lang/String;" in txt) or re.search(r"(?:TextView|TuxTextView|AppCompatTextView);->setText\(|SpannableString|SpannableStringBuilder|setSpan\(",txt))):
                     text_ui.append((name,desc,body))
           report=[]
           report.append("# Focused DM text renderer trace\n")
