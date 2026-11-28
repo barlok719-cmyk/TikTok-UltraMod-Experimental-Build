@@ -1,0 +1,95 @@
+name: ICQ Three-Lane Research
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [icq-search-database]
+    paths: [".github/workflows/icq-three-lane-research.yml"]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  trace:
+    name: ${{ matrix.lane }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - lane: dm-selection-send
+            terms: "SendMessageAssem;LX/0kQe;Emoji;ChatroomEmojiPanelAssem;StickerPanelAssemViewModel;GifContent;send;sticker;Giphy;IMGiphyInfo"
+            focus: "com/ss/android/ugc/aweme/im/sdk/chat/ui/base/assems/input/sendmsg/SendMessageAssem;LX/0kQe;com/ss/android/ugc/aweme/emoji/model/Emoji;com/ss/android/ugc/aweme/im/sdk/chat/ui/base/assems/input/panel/ChatroomEmojiPanelAssem;com/ss/android/ugc/aweme/viewmodel/StickerPanelAssemViewModel;LX/0kOo;LX/0NKm;LX/0NKZ"
+          - lane: dm-receive-render
+            terms: "GifContent;BaseContentParserKt;getOrParseJsonContent;IMMessageListProtocol;MessageList;PowerCell;Gif;setImage;setUrl;onBindViewHolder;ImageView"
+            focus: "LX/0YpJ;LX/0Exc;LX/0Etl;LX/1E00;com/ss/android/ugc/aweme/im/message/content/GifContent;com/ss/android/ugc/aweme/im/message/content/adapter/BaseContentParserKt;com/ss/android/ugc/aweme/im/messagelist/ui/MessageListSubmitListAbilityImpl;com/ss/android/ugc/aweme/im/messagelist/provider/MessageListComponentFactoryImpl;LX/0NAA;LX/0NAF;LX/0NBI"
+          - lane: comments-selection-send
+            terms: "CommentEmojiPanelAssem;EmojiInputViewImplV2;LX/0fuk;LX/0kRW;LX/0kRX;LX/0Mi3;LX/0gKt;LX/0gKu;CommentServiceImpl;PortraitInputKeyboard;GifContent;Emoji"
+            focus: "com/ss/android/ugc/aweme/comment/keyboard/keyboardv2/refactor/CommentEmojiPanelAssem;com/ss/android/ugc/aweme/comment/multipanel/EmojiInputViewImplV2;LX/0fuk;LX/0kRW;LX/0kRX;LX/0Mi3;LX/0gKt;LX/0gKu;LX/0kNv;LX/0kRR;com/ss/android/ugc/aweme/comment/keyboard/keyboardv2/refactor/PortraitInputKeyboard;com/ss/android/ugc/aweme/comment/service/CommentServiceImpl;com/ss/android/ugc/aweme/emoji/model/Emoji"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Locate latest successful experimental APK
+        id: apk
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow tiktok-patcher.yml --branch ultramod/experimental-full-build --status success --limit 20 --json databaseId --jq '.[0].databaseId')"
+          test -n "$RUN_ID" && test "$RUN_ID" != null
+          mkdir -p "$RUNNER_TEMP/apk"
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name tiktok-ultramod-apk --dir "$RUNNER_TEMP/apk"
+          mapfile -t APKS < <(find "$RUNNER_TEMP/apk" -type f -name '*.apk')
+          test "${#APKS[@]}" -eq 1
+          APK_SHA="$(sha256sum "${APKS[0]}" | awk '{print $1}')"
+          echo "apk_path=${APKS[0]}" >> "$GITHUB_OUTPUT"
+          echo "apk_sha=$APK_SHA" >> "$GITHUB_OUTPUT"
+      - name: Restore decoded DEX cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/icq-smali-db
+          key: icq-smali-v1-${{ steps.apk.outputs.apk_sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Download pinned apktool
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 --retry-delay 3 https://repo.maven.apache.org/maven2/org/apktool/apktool-cli/3.0.3/apktool-cli-3.0.3.jar -o "$RUNNER_TEMP/apktool-cli.jar"
+          test -s "$RUNNER_TEMP/apktool-cli.jar"
+      - name: Run focused lane using cached DEX
+        env:
+          JAVA_TOOL_OPTIONS: "-Xms512m -Xmx6g -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
+          TERMS: ${{ matrix.terms }}
+          FOCUS_CLASSES: ${{ matrix.focus }}
+        run: |
+          set -euo pipefail
+          if [ -n "$(find "$RUNNER_TEMP/icq-smali-db" -name .complete -print -quit 2>/dev/null || true)" ]; then
+            echo "Decoded DEX cache found. Reusing it; no APK disassembly."
+          else
+            echo "::error::Decoded DEX cache missing; refusing to disassemble APK."
+            exit 1
+          fi
+          python3 -u tools/icq/build_search_database.py \
+            --apk "${{ steps.apk.outputs.apk_path }}" \
+            --jar "$RUNNER_TEMP/apktool-cli.jar" \
+            --db "$RUNNER_TEMP/icq-smali-db" \
+            --terms "$TERMS" \
+            --focus-classes "$FOCUS_CLASSES" \
+            --output "$RUNNER_TEMP/trace" \
+            --api 35
+          printf 'Lane: %s\nAPK SHA: %s\nRead-only cached DEX analysis; no APK modification or build.\n' \
+            "${{ matrix.lane }}" "${{ steps.apk.outputs.apk_sha }}" > "$RUNNER_TEMP/trace/lane-provenance.md"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: icq-${{ matrix.lane }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/trace/
+          if-no-files-found: error
+          retention-days: 30
