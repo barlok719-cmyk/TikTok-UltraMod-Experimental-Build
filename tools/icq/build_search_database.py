@@ -54,7 +54,7 @@ def main():
     sha = digest(a.apk)
     dex_count = disassemble(a.apk, a.jar, a.db, a.api)
     terms = [x.strip() for x in a.terms.split(";") if x.strip()]
-    patterns = {t: re.compile(r"(?<![A-Za-z0-9])" + re.escape(t) + r"(?![A-Za-z0-9])", re.I) for t in terms}
+    patterns = {t: re.compile(r"(?<![A-Za-z0-9])" + re.escape(t) + r"(?![A-Za-z0-9])") for t in terms}
     class_hits = {t: [] for t in terms}
     method_hits = {t: [] for t in terms}
     class_count = method_count = invoke_count = 0
