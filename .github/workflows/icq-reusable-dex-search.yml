@@ -80,7 +80,7 @@ jobs:
             --jar "$RUNNER_TEMP/apktool-cli.jar" \
             --db "$RUNNER_TEMP/icq-smali-db" \
             --terms "$TERMS" \
-            --focus-classes "$FOCUS_CLASSES" \\
+            --focus-classes "$FOCUS_CLASSES" \
             --output "$RUNNER_TEMP/search-results" \
             --api 35
       - uses: actions/upload-artifact@v4
